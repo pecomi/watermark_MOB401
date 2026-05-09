@@ -1,0 +1,20 @@
+seed: 1234
+data_dir: data
+output_dir: outputs
+cpu: false
+
+batch_size: 128
+num_workers: 2
+train_subset:
+
+clean_epochs: 3
+wm_epochs: 2
+lr: 0.001
+
+target_label: 0
+lambda_wm: 1.0
+lambda_reg: 10.0
+importance_batches: 100
+
+pruning_ratios: [0.0, 0.2, 0.4, 0.6, 0.8]
+quantization_bits: [8, 4]
