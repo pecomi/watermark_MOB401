@@ -61,6 +61,22 @@ RESNET_SWEEP_FIELDS = [
     "diagnosis",
 ]
 
+POSTER_DIAGNOSTIC_FIELDS = [
+    "dataset",
+    "model",
+    "seed",
+    "method",
+    "stable_mask_percent",
+    "acc",
+    "wsr",
+    "wsr_non_target",
+    "clean_target_rate",
+    "pred_label_distribution",
+    "diagnosis",
+]
+
+POSTER_SUMMARY_METRICS = ["acc", "wsr", "wsr_non_target", "clean_target_rate"]
+
 
 def _write_csv(path, rows):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -76,6 +92,46 @@ def _write_rows(path, rows, fields):
         writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _mean(values):
+    return sum(values) / len(values) if values else float("nan")
+
+
+def _std(values):
+    if len(values) < 2:
+        return 0.0
+    avg = _mean(values)
+    return (sum((value - avg) ** 2 for value in values) / (len(values) - 1)) ** 0.5
+
+
+def _majority(values):
+    counts = {}
+    for value in values:
+        counts[value] = counts.get(value, 0) + 1
+    return sorted(counts.items(), key=lambda item: (-item[1], item[0]))[0][0] if counts else ""
+
+
+def _summarize_rows(rows, group_keys):
+    groups = {}
+    for row in rows:
+        key = tuple(row[group_key] for group_key in group_keys)
+        groups.setdefault(key, []).append(row)
+
+    summary = []
+    for key, group_rows in groups.items():
+        out = {group_key: value for group_key, value in zip(group_keys, key)}
+        for metric in POSTER_SUMMARY_METRICS:
+            values = [float(row[metric]) for row in group_rows]
+            out[f"{metric}_mean"] = _mean(values)
+            out[f"{metric}_std"] = _std(values)
+        out["diagnosis_majority"] = _majority([row["diagnosis"] for row in group_rows])
+        summary.append(out)
+    return summary
+
+
+def _poster_table(summary_rows, fields):
+    return [{field: row.get(field, "") for field in fields} for row in summary_rows]
 
 
 def _method_label(method):
@@ -188,6 +244,22 @@ def _train_method(method, cfg, clean_state, importance, train_loader, device, se
         return model, masks
 
     raise ValueError(f"Unsupported thesis method: {method}")
+
+
+def _diagnostic_row(cfg, seed, method, metrics, stable_mask_percent=""):
+    return {
+        "dataset": cfg["dataset"],
+        "model": cfg["model_name"],
+        "seed": seed,
+        "method": method,
+        "stable_mask_percent": stable_mask_percent,
+        "acc": metrics["acc"],
+        "wsr": metrics["wsr"],
+        "wsr_non_target": metrics["wsr_non_target"],
+        "clean_target_rate": metrics["clean_target_rate"],
+        "pred_label_distribution": metrics["pred_label_distribution"],
+        "diagnosis": metrics["diagnosis"],
+    }
 
 
 def _result_row(cfg, seed, method, compression_type, compression_level, metrics, survival, quant_error):
@@ -600,6 +672,136 @@ def run_resnet_watermark_sweep(cfg, device):
             print("candidate found for ResNet watermark gate")
 
     _write_rows(output_dir / "resnet_wm_sweep.csv", rows, RESNET_SWEEP_FIELDS)
+    return rows
+
+
+def _poster_base_cfg(args, methods):
+    cfg = default_thesis_config(args)
+    cfg.update(
+        {
+            "dataset": "cifar10",
+            "model_name": "resnet18_cifar",
+            "methods": methods,
+            "seeds": args.seeds or [42, 43, 44],
+            "output_dir": "outputs/poster_results",
+            "mask_granularity": "channel",
+        }
+    )
+    return cfg
+
+
+def run_resnet_precompression_diagnostic(args, device):
+    cfg = _poster_base_cfg(args, ["standard", "stable_aware_reg"])
+    output_dir = Path(cfg["output_dir"])
+    rows = []
+    for seed in cfg["seeds"]:
+        print(f"poster resnet diagnostic seed={seed}")
+        set_seed(seed)
+        train_loader, test_loader = make_loaders(
+            cfg["data_dir"],
+            cfg["batch_size"],
+            cfg["num_workers"],
+            seed,
+            cfg.get("train_subset"),
+            cfg["dataset"],
+        )
+        clean_model = build_model(cfg["dataset"], cfg["model_name"]).to(device)
+        train_clean(clean_model, train_loader, device, cfg["epochs_clean"], cfg["lr"])
+        clean_state = {
+            name: tensor.detach().cpu().clone()
+            for name, tensor in clean_model.state_dict().items()
+        }
+        importance = compute_importance(clean_model, train_loader, device, cfg["importance_batches"])
+        importance = {name: score.detach() for name, score in importance.items()}
+
+        for method in cfg["methods"]:
+            model, _ = _train_method(method, cfg, clean_state, importance, train_loader, device, seed)
+            metrics = evaluate_thesis_metrics(
+                model,
+                test_loader,
+                device,
+                target_label=cfg["target_label"],
+                dataset=cfg["dataset"],
+                trigger_size=cfg["trigger_size"],
+            )
+            rows.append(_diagnostic_row(cfg, seed, method, metrics))
+
+    summary = _summarize_rows(rows, ["model", "method"])
+    table_fields = ["model", "method", "acc_mean", "wsr_non_target_mean", "clean_target_rate_mean", "diagnosis_majority"]
+    _write_rows(output_dir / "resnet_precompression_diagnostic.csv", rows, POSTER_DIAGNOSTIC_FIELDS)
+    _write_rows(
+        output_dir / "resnet_precompression_summary.csv",
+        summary,
+        ["model", "method"]
+        + [f"{metric}_{suffix}" for metric in POSTER_SUMMARY_METRICS for suffix in ["mean", "std"]]
+        + ["diagnosis_majority"],
+    )
+    _write_rows(output_dir / "table_resnet_diagnostic.csv", _poster_table(summary, table_fields), table_fields)
+    return rows
+
+
+def run_direct_embedding_diagnostic(args, device):
+    cfg = _poster_base_cfg(args, ["stable_mask_direct", "random_mask_direct"])
+    output_dir = Path(cfg["output_dir"])
+    rows = []
+    for seed in cfg["seeds"]:
+        print(f"poster direct diagnostic seed={seed}")
+        set_seed(seed)
+        train_loader, test_loader = make_loaders(
+            cfg["data_dir"],
+            cfg["batch_size"],
+            cfg["num_workers"],
+            seed,
+            cfg.get("train_subset"),
+            cfg["dataset"],
+        )
+        clean_model = build_model(cfg["dataset"], cfg["model_name"]).to(device)
+        train_clean(clean_model, train_loader, device, cfg["epochs_clean"], cfg["lr"])
+        clean_state = {
+            name: tensor.detach().cpu().clone()
+            for name, tensor in clean_model.state_dict().items()
+        }
+        importance = compute_importance(clean_model, train_loader, device, cfg["importance_batches"])
+        importance = {name: score.detach() for name, score in importance.items()}
+
+        for stable_mask_percent in [0.1, 0.3]:
+            run_cfg = copy.deepcopy(cfg)
+            run_cfg["stable_mask_percent"] = stable_mask_percent
+            for method in cfg["methods"]:
+                model, _ = _train_method(method, run_cfg, clean_state, importance, train_loader, device, seed)
+                metrics = evaluate_thesis_metrics(
+                    model,
+                    test_loader,
+                    device,
+                    target_label=run_cfg["target_label"],
+                    dataset=run_cfg["dataset"],
+                    trigger_size=run_cfg["trigger_size"],
+                )
+                rows.append(_diagnostic_row(run_cfg, seed, method, metrics, stable_mask_percent))
+
+    summary = _summarize_rows(rows, ["model", "method", "stable_mask_percent"])
+    table_fields = [
+        "model",
+        "method",
+        "stable_mask_percent",
+        "acc_mean",
+        "wsr_non_target_mean",
+        "clean_target_rate_mean",
+        "diagnosis_majority",
+    ]
+    _write_rows(output_dir / "direct_embedding_diagnostic.csv", rows, POSTER_DIAGNOSTIC_FIELDS)
+    _write_rows(
+        output_dir / "direct_embedding_diagnostic_summary.csv",
+        summary,
+        ["model", "method", "stable_mask_percent"]
+        + [f"{metric}_{suffix}" for metric in POSTER_SUMMARY_METRICS for suffix in ["mean", "std"]]
+        + ["diagnosis_majority"],
+    )
+    _write_rows(
+        output_dir / "table_direct_embedding_diagnostic.csv",
+        _poster_table(summary, table_fields),
+        table_fields,
+    )
     return rows
 
 

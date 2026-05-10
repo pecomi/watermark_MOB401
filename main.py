@@ -16,6 +16,8 @@ from plot_results import plot_all
 from thesis import (
     default_thesis_config,
     run_direct_embedding_sweep,
+    run_direct_embedding_diagnostic,
+    run_resnet_precompression_diagnostic,
     run_resnet_watermark_sweep,
     run_thesis,
 )
@@ -362,6 +364,8 @@ def parse_args():
     parser.add_argument("--quick_test", action="store_true")
     parser.add_argument("--direct-sweep", action="store_true")
     parser.add_argument("--resnet-wm-sweep", action="store_true")
+    parser.add_argument("--poster-resnet-diagnostic", action="store_true")
+    parser.add_argument("--poster-direct-diagnostic", action="store_true")
     parser.add_argument("--lambda-wm", type=float, default=None)
     parser.add_argument("--lambda-reg", type=float, default=None)
     parser.add_argument("--poison-ratio", type=float, default=None)
@@ -412,6 +416,8 @@ if __name__ == "__main__":
         or args.seeds is not None
         or args.direct_sweep
         or args.resnet_wm_sweep
+        or args.poster_resnet_diagnostic
+        or args.poster_direct_diagnostic
     ):
         thesis_config = default_thesis_config(args)
         device_name = args.device
@@ -422,6 +428,10 @@ if __name__ == "__main__":
             run_direct_embedding_sweep(thesis_config, torch.device(device_name))
         elif args.resnet_wm_sweep:
             run_resnet_watermark_sweep(thesis_config, torch.device(device_name))
+        elif args.poster_resnet_diagnostic:
+            run_resnet_precompression_diagnostic(args, torch.device(device_name))
+        elif args.poster_direct_diagnostic:
+            run_direct_embedding_diagnostic(args, torch.device(device_name))
         else:
             run_thesis(thesis_config, torch.device(device_name))
         raise SystemExit(0)

@@ -81,6 +81,13 @@ ResNet18-CIFAR standard/stable-aware watermark sweep before compression:
 python main.py --dataset cifar10 --model resnet18_cifar --resnet-wm-sweep --device cuda:0
 ```
 
+Poster diagnostic tables:
+
+```powershell
+python main.py --poster-resnet-diagnostic --device cuda:0
+python main.py --poster-direct-diagnostic --device cuda:0
+```
+
 Run the best ResNet watermark configuration under pruning and quantization:
 
 ```powershell
@@ -138,6 +145,12 @@ python main.py --train-subset 5000 --clean-epochs 1 --wm-epochs 1
 - `outputs/thesis_results/direct_embedding_sweep.csv`
 - `outputs/resnet_wm_sweep.csv`
 - `outputs/debug/trigger_examples.png`
+- `outputs/poster_results/resnet_precompression_diagnostic.csv`
+- `outputs/poster_results/resnet_precompression_summary.csv`
+- `outputs/poster_results/direct_embedding_diagnostic.csv`
+- `outputs/poster_results/direct_embedding_diagnostic_summary.csv`
+- `outputs/poster_results/table_resnet_diagnostic.csv`
+- `outputs/poster_results/table_direct_embedding_diagnostic.csv`
 - `outputs/thesis_results/checkpoints/`
 - `outputs/thesis_results/figures/`
 - `outputs/figures/wsr_vs_pruning.png`
