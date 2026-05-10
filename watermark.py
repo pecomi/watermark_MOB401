@@ -88,3 +88,60 @@ def train_watermark(
             total += x.size(0)
         print(f"watermark epoch {epoch + 1}/{epochs} loss={total_loss / total:.4f}")
     return model
+
+
+def train_mask_direct_watermark(
+    model,
+    train_loader,
+    masks,
+    device,
+    epochs,
+    lr,
+    lambda_wm,
+    target_label=0,
+    dataset="cifar10",
+    trigger_size=3,
+    poison_ratio=0.01,
+):
+    model.train()
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    for epoch in range(epochs):
+        total_loss = 0.0
+        total = 0
+        for x, y in train_loader:
+            x, y = x.to(device), y.to(device)
+            poison_count = x.size(0) if poison_ratio >= 1.0 else max(1, int(x.size(0) * poison_ratio))
+            wm_x = add_trigger(x[:poison_count], dataset=dataset, trigger_size=trigger_size)
+            wm_y = torch.full((wm_x.size(0),), target_label, dtype=y.dtype, device=device)
+
+            optimizer.zero_grad(set_to_none=True)
+            clean_loss = F.cross_entropy(model(x), y)
+            clean_loss.backward()
+            clean_grads = {
+                name: None if param.grad is None else param.grad.detach().clone()
+                for name, param in model.named_parameters()
+            }
+
+            optimizer.zero_grad(set_to_none=True)
+            wm_loss = lambda_wm * F.cross_entropy(model(wm_x), wm_y)
+            wm_loss.backward()
+
+            for name, param in model.named_parameters():
+                clean_grad = clean_grads[name]
+                wm_grad = param.grad
+                if wm_grad is not None:
+                    mask = masks.get(name)
+                    if mask is None:
+                        wm_grad.zero_()
+                    else:
+                        wm_grad.mul_(mask.to(device=wm_grad.device, dtype=wm_grad.dtype))
+                    if clean_grad is not None:
+                        wm_grad.add_(clean_grad)
+                elif clean_grad is not None:
+                    param.grad = clean_grad
+
+            optimizer.step()
+            total_loss += (clean_loss.item() + wm_loss.item()) * x.size(0)
+            total += x.size(0)
+        print(f"mask-direct epoch {epoch + 1}/{epochs} loss={total_loss / total:.4f}")
+    return model

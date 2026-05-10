@@ -61,6 +61,20 @@ CIFAR-10 ResNet18 experiment:
 python main.py --config configs/cifar10_resnet18.yaml
 ```
 
+Thesis experiments with persistent-backdoor-inspired direct mask embedding:
+
+```powershell
+python main.py --dataset cifar10 --model cifar_small --methods standard stable_mask_direct random_mask_direct --quick_test
+python main.py --dataset cifar10 --model resnet18_cifar --methods standard stable_aware_reg stable_mask_direct random_mask_direct
+python main.py --dataset cifar10 --model resnet18_cifar --seeds 42 43 44 --methods standard stable_mask_direct random_mask_direct
+```
+
+Mask selection options:
+
+```powershell
+python main.py --dataset cifar10 --model cifar_small --methods stable_mask_direct --mask-granularity channel --selection-mode quant_stable
+```
+
 Select a specific GPU:
 
 ```powershell
@@ -90,6 +104,9 @@ python main.py --train-subset 5000 --clean-epochs 1 --wm-epochs 1
 - `outputs/cifar10_results_quantization.csv`
 - `outputs/cifar10_seed_repeat_results_pruning.csv`
 - `outputs/cifar10_lambda_ablation_results_quantization.csv`
+- `outputs/thesis_results/results_all.csv`
+- `outputs/thesis_results/checkpoints/`
+- `outputs/thesis_results/figures/`
 - `outputs/figures/wsr_vs_pruning.png`
 - `outputs/figures/acc_vs_pruning.png`
 - `outputs/figures/wsr_vs_quantization.png`

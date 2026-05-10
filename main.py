@@ -13,6 +13,7 @@ from evaluate import evaluate_acc, evaluate_wsr
 from importance import compute_importance
 from models import build_model
 from plot_results import plot_all
+from thesis import default_thesis_config, run_thesis
 from watermark import train_clean, train_watermark
 
 
@@ -340,6 +341,19 @@ def parse_args():
     )
     parser.add_argument("--config", default=None)
     parser.add_argument("--dataset", choices=["mnist", "cifar10"], default=None)
+    parser.add_argument("--model", choices=["cifar_small", "cifar_small_cnn", "resnet18_cifar"], default=None)
+    parser.add_argument(
+        "--methods",
+        nargs="+",
+        choices=["standard", "stable_aware_reg", "stable_mask_direct", "random_mask_direct"],
+        default=None,
+    )
+    parser.add_argument("--seeds", nargs="+", type=int, default=None)
+    parser.add_argument("--stable-mask-percent", type=float, default=None)
+    parser.add_argument("--mask-granularity", choices=["parameter", "channel"], default=None)
+    parser.add_argument("--selection-mode", choices=["fisher_top", "quant_stable", "random"], default=None)
+    parser.add_argument("--quant-stable-bits", type=int, default=None)
+    parser.add_argument("--quant-error-alpha", type=float, default=None)
     parser.add_argument("--quick_test", action="store_true")
     parser.add_argument("--cpu", action="store_true")
     parser.add_argument("--device", default=None, help="Device string, e.g. cpu, cuda, cuda:0, cuda:1")
@@ -372,6 +386,15 @@ def apply_cli_overrides(cfg, args):
 
 if __name__ == "__main__":
     args = parse_args()
+    if args.methods is not None or args.model is not None or args.seeds is not None:
+        thesis_config = default_thesis_config(args)
+        device_name = args.device
+        if device_name is None:
+            use_cuda = torch.cuda.is_available() and not args.cpu
+            device_name = "cuda" if use_cuda else "cpu"
+        run_thesis(thesis_config, torch.device(device_name))
+        raise SystemExit(0)
+
     dataset = "mnist" if args.dataset is None else args.dataset
     config_path = args.config if args.config is not None else f"configs/{dataset}.yaml"
     config = apply_cli_overrides(load_config(config_path), args)

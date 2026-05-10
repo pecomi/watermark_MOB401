@@ -72,7 +72,7 @@ def build_resnet18_cifar():
 def build_model(dataset, model_name=None):
     if dataset == "mnist":
         return SmallCNN()
-    if dataset == "cifar10" and model_name in [None, "cifar_small_cnn"]:
+    if dataset == "cifar10" and model_name in [None, "cifar_small", "cifar_small_cnn"]:
         return CIFARSmallCNN()
     if dataset == "cifar10" and model_name == "resnet18_cifar":
         return build_resnet18_cifar()
