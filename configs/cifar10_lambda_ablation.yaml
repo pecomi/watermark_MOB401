@@ -1,5 +1,8 @@
 dataset: cifar10
 model_name: cifar_small_cnn
+method: lambda_reg_ablation
+output_prefix: cifar10_lambda_ablation
+
 seed: 42
 data_dir: data
 output_dir: outputs
@@ -20,7 +23,8 @@ trigger_size: 3
 target_label: 0
 lambda_wm: 1.0
 lambda_reg: 0.1
+lambda_reg_values: [0.01, 0.1, 1.0]
 importance_batches: 100
 
 pruning_ratios: [0.0, 0.7, 0.9]
-quant_bits: [8, 4, 3]
+quant_bits: [4, 3]

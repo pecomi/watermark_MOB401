@@ -1,6 +1,10 @@
 dataset: cifar10
 model_name: cifar_small_cnn
+method: seed_repeat
+output_prefix: cifar10_seed_repeat
+
 seed: 42
+seeds: [42, 43, 44]
 data_dir: data
 output_dir: outputs
 cpu: false

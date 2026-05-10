@@ -43,6 +43,24 @@ Quick CIFAR-10 smoke run:
 python main.py --dataset cifar10 --quick_test
 ```
 
+Recommended CIFAR-10 seed repeat:
+
+```powershell
+python main.py --config configs/cifar10_seed_repeat.yaml
+```
+
+CIFAR-10 lambda regularization ablation:
+
+```powershell
+python main.py --config configs/cifar10_lambda_ablation.yaml
+```
+
+CIFAR-10 ResNet18 experiment:
+
+```powershell
+python main.py --config configs/cifar10_resnet18.yaml
+```
+
 Select a specific GPU:
 
 ```powershell
@@ -68,6 +86,10 @@ python main.py --train-subset 5000 --clean-epochs 1 --wm-epochs 1
 - `outputs/checkpoints/stable_aware_watermark.pt`
 - `outputs/results_pruning.csv`
 - `outputs/results_quantization.csv`
+- `outputs/cifar10_results_pruning.csv`
+- `outputs/cifar10_results_quantization.csv`
+- `outputs/cifar10_seed_repeat_results_pruning.csv`
+- `outputs/cifar10_lambda_ablation_results_quantization.csv`
 - `outputs/figures/wsr_vs_pruning.png`
 - `outputs/figures/acc_vs_pruning.png`
 - `outputs/figures/wsr_vs_quantization.png`

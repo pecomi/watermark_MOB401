@@ -1,5 +1,8 @@
 dataset: cifar10
-model_name: cifar_small_cnn
+model_name: resnet18_cifar
+method: resnet18_cifar
+output_prefix: cifar10_resnet18
+
 seed: 42
 data_dir: data
 output_dir: outputs
@@ -11,7 +14,7 @@ num_workers: 2
 train_subset:
 
 optimizer: Adam
-epochs_clean: 20
+epochs_clean: 30
 epochs_watermark: 5
 lr: 0.001
 

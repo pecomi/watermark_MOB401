@@ -1,4 +1,5 @@
 import torch.nn as nn
+from torchvision.models import resnet18
 
 
 class SmallCNN(nn.Module):
@@ -60,9 +61,19 @@ class CIFARSmallCNN(nn.Module):
         return self.classifier(x)
 
 
-def build_model(dataset):
+def build_resnet18_cifar():
+    model = resnet18(weights=None)
+    model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+    model.maxpool = nn.Identity()
+    model.fc = nn.Linear(model.fc.in_features, 10)
+    return model
+
+
+def build_model(dataset, model_name=None):
     if dataset == "mnist":
         return SmallCNN()
-    if dataset == "cifar10":
+    if dataset == "cifar10" and model_name in [None, "cifar_small_cnn"]:
         return CIFARSmallCNN()
+    if dataset == "cifar10" and model_name == "resnet18_cifar":
+        return build_resnet18_cifar()
     raise ValueError(f"Unsupported dataset: {dataset}")
