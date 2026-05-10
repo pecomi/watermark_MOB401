@@ -1,20 +1,20 @@
 from pathlib import Path
 
 
-def plot_metric(rows, x_key, y_key, title, xlabel, ylabel, output_path):
+def plot_metric(rows, x_key, y_key, title, xlabel, ylabel, output_path, group_key="model"):
     import matplotlib.pyplot as plt
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plt.figure(figsize=(6, 4))
-    for model_name in sorted({row["model"] for row in rows}):
-        model_rows = [row for row in rows if row["model"] == model_name]
+    for group_name in sorted({row[group_key] for row in rows}):
+        model_rows = [row for row in rows if row[group_key] == group_name]
         model_rows = sorted(model_rows, key=lambda row: row[x_key])
         plt.plot(
             [row[x_key] for row in model_rows],
             [row[y_key] for row in model_rows],
             marker="o",
-            label=model_name,
+            label=group_name,
         )
     plt.title(title)
     plt.xlabel(xlabel)
@@ -26,8 +26,9 @@ def plot_metric(rows, x_key, y_key, title, xlabel, ylabel, output_path):
     plt.close()
 
 
-def plot_all(pruning_rows, quantization_rows, figure_dir):
+def plot_all(pruning_rows, quantization_rows, figure_dir, prefix="", group_key="model"):
     figure_dir = Path(figure_dir)
+    prefix = f"{prefix}_" if prefix else ""
     plot_metric(
         pruning_rows,
         "pruning_ratio",
@@ -35,7 +36,8 @@ def plot_all(pruning_rows, quantization_rows, figure_dir):
         "WSR vs Pruning Ratio",
         "Pruning ratio",
         "WSR",
-        figure_dir / "wsr_vs_pruning.png",
+        figure_dir / f"{prefix}wsr_vs_pruning.png",
+        group_key,
     )
     plot_metric(
         pruning_rows,
@@ -44,7 +46,8 @@ def plot_all(pruning_rows, quantization_rows, figure_dir):
         "ACC vs Pruning Ratio",
         "Pruning ratio",
         "Accuracy",
-        figure_dir / "acc_vs_pruning.png",
+        figure_dir / f"{prefix}acc_vs_pruning.png",
+        group_key,
     )
     plot_metric(
         quantization_rows,
@@ -53,7 +56,8 @@ def plot_all(pruning_rows, quantization_rows, figure_dir):
         "WSR vs Quantization Bits",
         "Bits",
         "WSR",
-        figure_dir / "wsr_vs_quantization.png",
+        figure_dir / f"{prefix}wsr_vs_quantization.png",
+        group_key,
     )
     plot_metric(
         quantization_rows,
@@ -62,5 +66,6 @@ def plot_all(pruning_rows, quantization_rows, figure_dir):
         "ACC vs Quantization Bits",
         "Bits",
         "Accuracy",
-        figure_dir / "acc_vs_quantization.png",
+        figure_dir / f"{prefix}acc_vs_quantization.png",
+        group_key,
     )

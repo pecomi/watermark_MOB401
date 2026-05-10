@@ -28,19 +28,31 @@ pip install -r requirements.txt
 ## Run
 
 ```powershell
-python main.py --config configs/mnist.yaml
+python main.py --dataset mnist
+```
+
+Run CIFAR-10:
+
+```powershell
+python main.py --dataset cifar10
+```
+
+Quick CIFAR-10 smoke run:
+
+```powershell
+python main.py --dataset cifar10 --quick_test
 ```
 
 Select a specific GPU:
 
 ```powershell
-python main.py --config configs/mnist.yaml --device cuda:1
+python main.py --dataset cifar10 --device cuda:1
 ```
 
 Force CPU:
 
 ```powershell
-python main.py --config configs/mnist.yaml --cpu
+python main.py --dataset mnist --cpu
 ```
 
 Fast smoke run:

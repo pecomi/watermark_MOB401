@@ -25,15 +25,29 @@ def seed_worker(worker_id):
     random.seed(worker_seed)
 
 
-def make_loaders(data_dir, batch_size, num_workers, seed, train_subset=None):
-    transform = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Normalize((MNIST_MEAN,), (MNIST_STD,)),
-        ]
-    )
-    train_set = datasets.MNIST(data_dir, train=True, download=True, transform=transform)
-    test_set = datasets.MNIST(data_dir, train=False, download=True, transform=transform)
+def make_loaders(
+    data_dir,
+    batch_size,
+    num_workers,
+    seed,
+    train_subset=None,
+    dataset="mnist",
+):
+    if dataset == "mnist":
+        transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize((MNIST_MEAN,), (MNIST_STD,)),
+            ]
+        )
+        train_set = datasets.MNIST(data_dir, train=True, download=True, transform=transform)
+        test_set = datasets.MNIST(data_dir, train=False, download=True, transform=transform)
+    elif dataset == "cifar10":
+        transform = transforms.ToTensor()
+        train_set = datasets.CIFAR10(data_dir, train=True, download=True, transform=transform)
+        test_set = datasets.CIFAR10(data_dir, train=False, download=True, transform=transform)
+    else:
+        raise ValueError(f"Unsupported dataset: {dataset}")
 
     if train_subset is not None and train_subset < len(train_set):
         generator = torch.Generator().manual_seed(seed)

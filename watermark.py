@@ -4,10 +4,17 @@ import torch.nn.functional as F
 from data import MNIST_MEAN, MNIST_STD
 
 
-def add_trigger(x):
+def add_trigger(x, dataset="mnist", trigger_size=None):
     triggered = x.clone()
-    white_value = (1.0 - MNIST_MEAN) / MNIST_STD
-    triggered[:, :, -4:, -4:] = white_value
+    if dataset == "mnist":
+        size = 4 if trigger_size is None else trigger_size
+        white_value = (1.0 - MNIST_MEAN) / MNIST_STD
+    elif dataset == "cifar10":
+        size = 3 if trigger_size is None else trigger_size
+        white_value = 1.0
+    else:
+        raise ValueError(f"Unsupported dataset: {dataset}")
+    triggered[:, :, -size:, -size:] = white_value
     return triggered
 
 
@@ -49,6 +56,9 @@ def train_watermark(
     lambda_reg=0.0,
     importance=None,
     target_label=0,
+    dataset="mnist",
+    trigger_size=None,
+    poison_ratio=1.0,
 ):
     model.train()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -57,8 +67,13 @@ def train_watermark(
         total = 0
         for x, y in train_loader:
             x, y = x.to(device), y.to(device)
-            wm_x = add_trigger(x)
-            wm_y = torch.full_like(y, target_label)
+            if poison_ratio >= 1.0:
+                wm_source = x
+            else:
+                poison_count = max(1, int(x.size(0) * poison_ratio))
+                wm_source = x[:poison_count]
+            wm_x = add_trigger(wm_source, dataset=dataset, trigger_size=trigger_size)
+            wm_y = torch.full((wm_x.size(0),), target_label, dtype=y.dtype, device=device)
 
             optimizer.zero_grad(set_to_none=True)
             clean_loss = F.cross_entropy(model(x), y)

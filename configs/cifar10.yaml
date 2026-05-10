@@ -1,0 +1,26 @@
+dataset: cifar10
+model_name: cifar_small_cnn
+seed: 42
+data_dir: data
+output_dir: outputs
+cpu: false
+device:
+
+batch_size: 128
+num_workers: 2
+train_subset:
+
+optimizer: Adam
+epochs_clean: 20
+epochs_watermark: 5
+lr: 0.001
+
+poison_ratio: 0.01
+trigger_size: 3
+target_label: 0
+lambda_wm: 1.0
+lambda_reg: 0.1
+importance_batches: 100
+
+pruning_ratios: [0.0, 0.3, 0.5, 0.7, 0.9]
+quant_bits: [8, 4, 3, 2]

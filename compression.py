@@ -25,6 +25,8 @@ def apply_pruning(model, ratio):
 
 @torch.no_grad()
 def apply_fake_quantization(model, bits):
+    # Simulated per-tensor weight quantize-dequantize for sensitivity testing.
+    # This is not full INT8 deployment quantization with quantized kernels.
     quantized = copy.deepcopy(model)
     levels = (2**bits) - 1
     for module in quantized.modules():
