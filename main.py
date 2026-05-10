@@ -13,7 +13,12 @@ from evaluate import evaluate_acc, evaluate_wsr
 from importance import compute_importance
 from models import build_model
 from plot_results import plot_all
-from thesis import default_thesis_config, run_thesis
+from thesis import (
+    default_thesis_config,
+    run_direct_embedding_sweep,
+    run_resnet_watermark_sweep,
+    run_thesis,
+)
 from watermark import train_clean, train_watermark
 
 
@@ -355,6 +360,21 @@ def parse_args():
     parser.add_argument("--quant-stable-bits", type=int, default=None)
     parser.add_argument("--quant-error-alpha", type=float, default=None)
     parser.add_argument("--quick_test", action="store_true")
+    parser.add_argument("--direct-sweep", action="store_true")
+    parser.add_argument("--resnet-wm-sweep", action="store_true")
+    parser.add_argument("--lambda-wm", type=float, default=None)
+    parser.add_argument("--lambda-reg", type=float, default=None)
+    parser.add_argument("--poison-ratio", type=float, default=None)
+    parser.add_argument("--trigger-size", type=int, default=None)
+    parser.add_argument("--target-label", type=int, default=None)
+    parser.add_argument("--learning-rate-watermark", type=float, default=None)
+    parser.add_argument("--watermark-steps-per-batch", type=int, default=None)
+    parser.add_argument("--watermark-train-mode", choices=["joint", "alternating"], default=None)
+    parser.add_argument("--direct-embedding-mode", choices=["joint", "wm_focused"], default=None)
+    parser.add_argument("--lambda-clean", type=float, default=None)
+    parser.add_argument("--use-activation-guidance", action="store_true")
+    parser.add_argument("--activation-layer", default=None)
+    parser.add_argument("--lambda-act", type=float, default=None)
     parser.add_argument("--cpu", action="store_true")
     parser.add_argument("--device", default=None, help="Device string, e.g. cpu, cuda, cuda:0, cuda:1")
     parser.add_argument("--train-subset", type=int, default=None)
@@ -386,13 +406,24 @@ def apply_cli_overrides(cfg, args):
 
 if __name__ == "__main__":
     args = parse_args()
-    if args.methods is not None or args.model is not None or args.seeds is not None:
+    if (
+        args.methods is not None
+        or args.model is not None
+        or args.seeds is not None
+        or args.direct_sweep
+        or args.resnet_wm_sweep
+    ):
         thesis_config = default_thesis_config(args)
         device_name = args.device
         if device_name is None:
             use_cuda = torch.cuda.is_available() and not args.cpu
             device_name = "cuda" if use_cuda else "cpu"
-        run_thesis(thesis_config, torch.device(device_name))
+        if args.direct_sweep:
+            run_direct_embedding_sweep(thesis_config, torch.device(device_name))
+        elif args.resnet_wm_sweep:
+            run_resnet_watermark_sweep(thesis_config, torch.device(device_name))
+        else:
+            run_thesis(thesis_config, torch.device(device_name))
         raise SystemExit(0)
 
     dataset = "mnist" if args.dataset is None else args.dataset

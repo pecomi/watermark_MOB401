@@ -69,6 +69,36 @@ python main.py --dataset cifar10 --model resnet18_cifar --methods standard stabl
 python main.py --dataset cifar10 --model resnet18_cifar --seeds 42 43 44 --methods standard stable_mask_direct random_mask_direct
 ```
 
+Direct embedding sweep for diagnosing low WSR:
+
+```powershell
+python main.py --dataset cifar10 --model resnet18_cifar --methods stable_mask_direct --direct-sweep --device cuda:0
+```
+
+ResNet18-CIFAR standard/stable-aware watermark sweep before compression:
+
+```powershell
+python main.py --dataset cifar10 --model resnet18_cifar --resnet-wm-sweep --device cuda:0
+```
+
+Run the best ResNet watermark configuration under pruning and quantization:
+
+```powershell
+python main.py --dataset cifar10 --model resnet18_cifar --seeds 42 43 44 --methods standard stable_aware_reg --target-label 1 --trigger-size 5 --poison-ratio 0.05 --wm-epochs 10 --lambda-wm 5.0 --lambda-reg 0.1 --learning-rate-watermark 0.0005 --watermark-train-mode alternating --watermark-steps-per-batch 2 --device cuda:0
+```
+
+Run a selected stronger direct-embedding configuration under pruning and quantization:
+
+```powershell
+python main.py --dataset cifar10 --model resnet18_cifar --seeds 42 43 44 --methods standard stable_mask_direct --stable-mask-percent 0.3 --lambda-wm 10.0 --poison-ratio 0.03 --watermark-steps-per-batch 2 --direct-embedding-mode wm_focused --lambda-clean 0.5 --device cuda:0
+```
+
+Compare stable and random direct masks with the same training procedure:
+
+```powershell
+python main.py --dataset cifar10 --model resnet18_cifar --seeds 42 43 44 --methods stable_mask_direct random_mask_direct --stable-mask-percent 0.3 --lambda-wm 10.0 --poison-ratio 0.03 --watermark-steps-per-batch 2 --device cuda:0
+```
+
 Mask selection options:
 
 ```powershell
@@ -105,6 +135,9 @@ python main.py --train-subset 5000 --clean-epochs 1 --wm-epochs 1
 - `outputs/cifar10_seed_repeat_results_pruning.csv`
 - `outputs/cifar10_lambda_ablation_results_quantization.csv`
 - `outputs/thesis_results/results_all.csv`
+- `outputs/thesis_results/direct_embedding_sweep.csv`
+- `outputs/resnet_wm_sweep.csv`
+- `outputs/debug/trigger_examples.png`
 - `outputs/thesis_results/checkpoints/`
 - `outputs/thesis_results/figures/`
 - `outputs/figures/wsr_vs_pruning.png`
