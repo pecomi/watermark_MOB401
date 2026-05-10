@@ -31,6 +31,18 @@ pip install -r requirements.txt
 python main.py --config configs/mnist.yaml
 ```
 
+Select a specific GPU:
+
+```powershell
+python main.py --config configs/mnist.yaml --device cuda:1
+```
+
+Force CPU:
+
+```powershell
+python main.py --config configs/mnist.yaml --cpu
+```
+
 Fast smoke run:
 
 ```powershell

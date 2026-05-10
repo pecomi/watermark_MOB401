@@ -2,6 +2,7 @@ seed: 1234
 data_dir: data
 output_dir: outputs
 cpu: false
+device:
 
 batch_size: 128
 num_workers: 2

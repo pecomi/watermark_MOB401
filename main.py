@@ -35,8 +35,11 @@ def load_config(path):
 
 def run(cfg):
     set_seed(cfg["seed"])
-    use_cuda = torch.cuda.is_available() and not cfg.get("cpu", False)
-    device = torch.device("cuda" if use_cuda else "cpu")
+    device_name = cfg.get("device")
+    if device_name is None:
+        use_cuda = torch.cuda.is_available() and not cfg.get("cpu", False)
+        device_name = "cuda" if use_cuda else "cpu"
+    device = torch.device(device_name)
     print(f"device={device}")
 
     output_dir = Path(cfg["output_dir"])
@@ -162,6 +165,7 @@ def parse_args():
     )
     parser.add_argument("--config", default="configs/mnist.yaml")
     parser.add_argument("--cpu", action="store_true")
+    parser.add_argument("--device", default=None, help="Device string, e.g. cpu, cuda, cuda:0, cuda:1")
     parser.add_argument("--train-subset", type=int, default=None)
     parser.add_argument("--clean-epochs", type=int, default=None)
     parser.add_argument("--wm-epochs", type=int, default=None)
@@ -171,6 +175,9 @@ def parse_args():
 def apply_cli_overrides(cfg, args):
     if args.cpu:
         cfg["cpu"] = True
+        cfg["device"] = "cpu"
+    if args.device is not None:
+        cfg["device"] = args.device
     for key in ["train_subset", "clean_epochs", "wm_epochs"]:
         value = getattr(args, key)
         if value is not None:
