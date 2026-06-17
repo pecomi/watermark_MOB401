@@ -196,6 +196,20 @@ def _save_trigger_debug_grid(data_loader, dataset, trigger_size, output_path):
     save_image(grid, output_path)
 
 
+def _method_value(cfg, method, key, default=None):
+    method_key = method.replace("_reg", "")
+    keys = [
+        f"{method}_{key}",
+        f"{method_key}_{key}",
+    ]
+    if method in ["standard", "stable_aware_reg"]:
+        keys.append(f"baseline_{key}")
+    for candidate in keys:
+        if candidate in cfg:
+            return cfg[candidate]
+    return cfg.get(key, default)
+
+
 def _train_method(method, cfg, clean_state, importance, watermark_importance, train_loader, device, seed):
     model = build_model(cfg["dataset"], cfg["model_name"]).to(device)
     model.load_state_dict(clean_state)
@@ -206,15 +220,15 @@ def _train_method(method, cfg, clean_state, importance, watermark_importance, tr
             clean_state,
             train_loader,
             device,
-            cfg["epochs_watermark"],
-            cfg.get("learning_rate_watermark", cfg["lr"]),
-            cfg["lambda_wm"],
+            _method_value(cfg, method, "epochs_watermark", cfg["epochs_watermark"]),
+            _method_value(cfg, method, "learning_rate_watermark", cfg.get("learning_rate_watermark", cfg["lr"])),
+            _method_value(cfg, method, "lambda_wm", cfg["lambda_wm"]),
             target_label=cfg["target_label"],
             dataset=cfg["dataset"],
             trigger_size=cfg["trigger_size"],
-            poison_ratio=cfg["poison_ratio"],
-            watermark_train_mode=cfg.get("watermark_train_mode", "joint"),
-            watermark_steps_per_batch=cfg.get("watermark_steps_per_batch", 1),
+            poison_ratio=_method_value(cfg, method, "poison_ratio", cfg["poison_ratio"]),
+            watermark_train_mode=_method_value(cfg, method, "watermark_train_mode", cfg.get("watermark_train_mode", "joint")),
+            watermark_steps_per_batch=_method_value(cfg, method, "watermark_steps_per_batch", cfg.get("watermark_steps_per_batch", 1)),
         )
         return model, {}
 
@@ -224,17 +238,17 @@ def _train_method(method, cfg, clean_state, importance, watermark_importance, tr
             clean_state,
             train_loader,
             device,
-            cfg["epochs_watermark"],
-            cfg.get("learning_rate_watermark", cfg["lr"]),
-            cfg["lambda_wm"],
-            lambda_reg=cfg["lambda_reg"],
+            _method_value(cfg, method, "epochs_watermark", cfg["epochs_watermark"]),
+            _method_value(cfg, method, "learning_rate_watermark", cfg.get("learning_rate_watermark", cfg["lr"])),
+            _method_value(cfg, method, "lambda_wm", cfg["lambda_wm"]),
+            lambda_reg=_method_value(cfg, method, "lambda_reg", cfg["lambda_reg"]),
             importance=importance,
             target_label=cfg["target_label"],
             dataset=cfg["dataset"],
             trigger_size=cfg["trigger_size"],
-            poison_ratio=cfg["poison_ratio"],
-            watermark_train_mode=cfg.get("watermark_train_mode", "joint"),
-            watermark_steps_per_batch=cfg.get("watermark_steps_per_batch", 1),
+            poison_ratio=_method_value(cfg, method, "poison_ratio", cfg["poison_ratio"]),
+            watermark_train_mode=_method_value(cfg, method, "watermark_train_mode", cfg.get("watermark_train_mode", "joint")),
+            watermark_steps_per_batch=_method_value(cfg, method, "watermark_steps_per_batch", cfg.get("watermark_steps_per_batch", 1)),
         )
         return model, {}
 

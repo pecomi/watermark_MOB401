@@ -2,10 +2,10 @@ experiment_type: thesis
 dataset: cifar10
 model_name: cifar_small
 methods: [standard, stable_aware_reg, stable_mask_direct, random_mask_direct]
-seeds: [42, 43, 44]
+seeds: [42]
 data_dir: data
 output_dir: outputs/thesis_results
-result_name: results_full_mask30
+result_name: results_full_mask30_seed42
 clean_checkpoint: outputs/thesis_results/checkpoints/cifar10_cifar_small_seed{seed}_clean.pt
 pretrain_only: false
 cpu: false

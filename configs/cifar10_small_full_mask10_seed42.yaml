@@ -2,14 +2,14 @@ experiment_type: thesis
 dataset: cifar10
 model_name: cifar_small
 methods: [standard, stable_aware_reg, stable_mask_direct, random_mask_direct]
-seeds: [42, 43, 44]
+seeds: [42]
 data_dir: data
 output_dir: outputs/thesis_results
-result_name: results_full_mask30
+result_name: results_full_mask10_seed42
 clean_checkpoint: outputs/thesis_results/checkpoints/cifar10_cifar_small_seed{seed}_clean.pt
 pretrain_only: false
 cpu: false
-device: cuda:1
+device: cuda:2
 
 batch_size: 128
 num_workers: 2
@@ -31,7 +31,7 @@ lambda_wm: 2.0
 lambda_reg: 1.0
 importance_batches: 100
 
-stable_mask_percent: 0.3
+stable_mask_percent: 0.1
 mask_granularity: channel
 selection_mode: fisher_top
 quant_stable_bits: 4

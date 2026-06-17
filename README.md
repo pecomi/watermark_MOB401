@@ -63,6 +63,17 @@ Then load the fixed clean checkpoint and train only the watermark methods:
 python main.py --config configs/cifar10_small_full_mask30.yaml
 ```
 
+The full config includes `standard`, `stable_aware_reg`, `stable_mask_direct`, and
+`random_mask_direct`. Baseline methods use a separate watermark learning rate so they are
+not under-trained by the conservative direct-mask setting.
+
+Single-seed example run for report figures:
+
+```powershell
+python main.py --config configs/cifar10_small_full_mask30_seed42.yaml
+python main.py --plot-results outputs/thesis_results/results_full_mask30_seed42.csv
+```
+
 Mask-capacity ablation:
 
 ```powershell
