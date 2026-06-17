@@ -19,6 +19,51 @@ clean_loss + lambda_wm * watermark_loss
 
 where `F_i` is estimated from squared cross-entropy gradients on clean training batches.
 
+## Stable-Component Direct Embedding Hypothesis
+
+The original ResNet18-CIFAR experiments mainly searched for watermark hyperparameters that
+produce a strong trigger response before compression. A simpler diagnostic question is whether
+the watermark can be embedded into the model components that are already stable under clean-task
+training and compression. This does not require ResNet18 as the first validation target; the same
+mechanism can be checked with the CIFAR small CNN.
+
+This repository tests that hypothesis with direct mask embedding:
+
+- `stable_mask_direct`: select stable parameters or channels using Fisher-like clean-task
+  importance, optionally adjusted by simulated quantization error, then restrict watermark
+  updates to that selected mask.
+- `random_mask_direct`: use the same amount of masked capacity, but choose the mask randomly.
+  This is the control condition for testing whether stability-aware selection matters.
+- `standard`: train the trigger watermark without stable-component targeting.
+- `stable_aware_reg`: keep the regularization-based baseline, which protects clean-important
+  weights but does not directly force the watermark signal into selected stable components.
+
+The small-CNN experiment is useful because it isolates the main claim from ResNet-specific
+optimization difficulty. If `stable_mask_direct` gives higher WSR retention than
+`random_mask_direct` after pruning or low-bit quantization while preserving clean accuracy, that
+supports the idea that stable components are a good carrier for the watermark signal. ResNet18 can
+then be treated as the larger-scale setting where the same idea needs stronger optimization and
+hyperparameter tuning.
+
+Recommended small-CNN check:
+
+```powershell
+python main.py --dataset cifar10 --model cifar_small --seeds 42 43 44 --methods standard stable_aware_reg stable_mask_direct random_mask_direct --device cuda:0
+```
+
+Fast smoke version:
+
+```powershell
+python main.py --dataset cifar10 --model cifar_small --methods stable_mask_direct random_mask_direct --quick_test
+```
+
+Mask-selection ablation:
+
+```powershell
+python main.py --dataset cifar10 --model cifar_small --methods stable_mask_direct random_mask_direct --stable-mask-percent 0.1 --mask-granularity channel --selection-mode fisher_top
+python main.py --dataset cifar10 --model cifar_small --methods stable_mask_direct random_mask_direct --stable-mask-percent 0.1 --mask-granularity channel --selection-mode quant_stable
+```
+
 ## Setup
 
 ```powershell
