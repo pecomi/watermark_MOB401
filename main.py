@@ -413,10 +413,41 @@ def apply_cli_overrides(cfg, args):
     return cfg
 
 
+def is_thesis_config(cfg):
+    return (
+        cfg.get("experiment_type") == "thesis"
+        or "methods" in cfg
+        or "pretrain_only" in cfg
+        or "clean_checkpoint" in cfg
+    )
+
+
+def load_thesis_config(args, loaded_config=None):
+    cfg = default_thesis_config(args)
+    if loaded_config is not None:
+        cfg.update(loaded_config)
+    if args.dataset is not None:
+        cfg["dataset"] = args.dataset
+    if args.model is not None:
+        cfg["model_name"] = args.model
+    if args.methods is not None:
+        cfg["methods"] = args.methods
+    if args.seeds is not None:
+        cfg["seeds"] = args.seeds
+    if args.device is not None:
+        cfg["device"] = args.device
+    if args.cpu:
+        cfg["cpu"] = True
+        cfg["device"] = "cpu"
+    return cfg
+
+
 if __name__ == "__main__":
     args = parse_args()
+    loaded_config = load_config(args.config) if args.config is not None else None
     if (
-        args.methods is not None
+        (loaded_config is not None and is_thesis_config(loaded_config))
+        or args.methods is not None
         or args.model is not None
         or args.seeds is not None
         or args.direct_sweep
@@ -426,10 +457,10 @@ if __name__ == "__main__":
         or args.clean_checkpoint is not None
         or args.pretrain_only
     ):
-        thesis_config = default_thesis_config(args)
-        device_name = args.device
+        thesis_config = load_thesis_config(args, loaded_config)
+        device_name = thesis_config.get("device")
         if device_name is None:
-            use_cuda = torch.cuda.is_available() and not args.cpu
+            use_cuda = torch.cuda.is_available() and not thesis_config.get("cpu", False)
             device_name = "cuda" if use_cuda else "cpu"
         if args.direct_sweep:
             run_direct_embedding_sweep(thesis_config, torch.device(device_name))
@@ -445,5 +476,5 @@ if __name__ == "__main__":
 
     dataset = "mnist" if args.dataset is None else args.dataset
     config_path = args.config if args.config is not None else f"configs/{dataset}.yaml"
-    config = apply_cli_overrides(load_config(config_path), args)
+    config = apply_cli_overrides(loaded_config if loaded_config is not None else load_config(config_path), args)
     run(config)

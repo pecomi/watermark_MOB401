@@ -1,0 +1,17 @@
+experiment_type: thesis
+dataset: cifar10
+model_name: cifar_small
+seeds: [42, 43, 44]
+data_dir: data
+output_dir: outputs/thesis_results
+clean_checkpoint: outputs/thesis_results/checkpoints/cifar10_cifar_small_seed{seed}_clean.pt
+pretrain_only: true
+cpu: false
+device: cuda:1
+
+batch_size: 128
+num_workers: 2
+train_subset:
+
+epochs_clean: 20
+lr: 0.001

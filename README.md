@@ -54,13 +54,19 @@ python main.py --dataset cifar10 --model cifar_small --seeds 42 43 44 --methods 
 Pretrain the clean small-CNN once and reuse it for watermark-only experiments:
 
 ```powershell
-python main.py --dataset cifar10 --model cifar_small --seeds 42 --pretrain-only --clean-checkpoint outputs/thesis_results/checkpoints/cifar10_cifar_small_seed{seed}_clean.pt --device cuda:0
+python main.py --config configs/cifar10_small_pretrain.yaml
 ```
 
 Then load the fixed clean checkpoint and train only the watermark methods:
 
 ```powershell
-python main.py --dataset cifar10 --model cifar_small --methods stable_mask_direct random_mask_direct --seeds 42 --clean-checkpoint outputs/thesis_results/checkpoints/cifar10_cifar_small_seed{seed}_clean.pt --wm-epochs 20 --stable-mask-percent 0.3 --poison-ratio 0.05 --lambda-wm 5.0 --watermark-steps-per-batch 2 --direct-embedding-mode wm_focused --lambda-clean 0.3 --learning-rate-watermark 0.0003 --mask-floor 0.05 --wm-importance-alpha 0.5 --grad-clip 1.0 --trigger-size 4 --target-label 0 --device cuda:0
+python main.py --config configs/cifar10_small_direct_mask30.yaml
+```
+
+Mask-capacity ablation:
+
+```powershell
+python main.py --config configs/cifar10_small_direct_mask10.yaml
 ```
 
 Fast smoke version:
@@ -80,7 +86,7 @@ Improved direct embedding with soft stable-biased updates and watermark-gradient
 selection:
 
 ```powershell
-python main.py --dataset cifar10 --model cifar_small --methods stable_mask_direct random_mask_direct --seeds 42 --wm-epochs 20 --stable-mask-percent 0.3 --poison-ratio 0.05 --lambda-wm 5.0 --watermark-steps-per-batch 2 --direct-embedding-mode wm_focused --lambda-clean 0.3 --learning-rate-watermark 0.0003 --mask-floor 0.05 --wm-importance-alpha 0.5 --grad-clip 1.0 --trigger-size 4 --target-label 0 --device cuda:0
+python main.py --dataset cifar10 --model cifar_small --methods stable_mask_direct random_mask_direct --seeds 42 --wm-epochs 10 --stable-mask-percent 0.3 --poison-ratio 0.03 --lambda-wm 2.0 --lambda-reg 1.0 --watermark-steps-per-batch 1 --direct-embedding-mode wm_focused --lambda-clean 1.0 --learning-rate-watermark 0.0001 --mask-floor 0.02 --wm-importance-alpha 0.5 --grad-clip 0.5 --trigger-size 4 --target-label 0 --device cuda:0
 ```
 
 ## Setup

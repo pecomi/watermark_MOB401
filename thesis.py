@@ -366,7 +366,8 @@ def _plot_all(rows, figure_dir):
 def run_thesis(cfg, device):
     output_dir = Path(cfg["output_dir"])
     checkpoint_dir = output_dir / "checkpoints"
-    figure_dir = output_dir / "figures"
+    result_name = cfg.get("result_name", "results_all")
+    figure_dir = output_dir / "figures" / result_name
     rows = []
 
     for seed in cfg["seeds"]:
@@ -518,7 +519,7 @@ def run_thesis(cfg, device):
 
     if cfg.get("pretrain_only"):
         return rows
-    _write_csv(output_dir / "results_all.csv", rows)
+    _write_csv(output_dir / f"{result_name}.csv", rows)
     _plot_all(rows, figure_dir)
     return rows
 
@@ -913,6 +914,7 @@ def default_thesis_config(args):
         "seeds": seeds,
         "data_dir": "data",
         "output_dir": "outputs/thesis_results",
+        "result_name": "results_all",
         "clean_checkpoint": args.clean_checkpoint,
         "pretrain_only": args.pretrain_only,
         "batch_size": 128,
