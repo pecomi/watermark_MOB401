@@ -97,6 +97,19 @@ def _write_rows(path, rows, fields):
         writer.writerows(rows)
 
 
+def load_rows(path):
+    with Path(path).open("r", newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def plot_rows_file(csv_path, output_dir=None):
+    csv_path = Path(csv_path)
+    rows = load_rows(csv_path)
+    figure_dir = Path(output_dir) if output_dir is not None else csv_path.parent / "figures" / csv_path.stem
+    _plot_all(rows, figure_dir)
+    return figure_dir
+
+
 def _mean(values):
     return sum(values) / len(values) if values else float("nan")
 
@@ -314,45 +327,181 @@ def _result_row(cfg, seed, method, compression_type, compression_level, metrics,
     }
 
 
-def _plot_metric(rows, compression_type, metric, output_path, ylabel):
+def _plot_label(method):
+    labels = {
+        "standard": "Standard",
+        "stable_aware_reg": "Stable-aware reg.",
+        "stable_mask_direct": "Stable mask",
+        "random_mask_direct": "Random mask",
+    }
+    return labels.get(method, method)
+
+
+def _plot_order(method):
+    order = {
+        "standard": 0,
+        "stable_aware_reg": 1,
+        "stable_mask_direct": 2,
+        "random_mask_direct": 3,
+    }
+    return order.get(method, 99)
+
+
+def _finite_float(value):
+    value = float(value)
+    return value if math.isfinite(value) else None
+
+
+def _save_report_figure(output_path):
+    import matplotlib.pyplot as plt
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300)
+    plt.savefig(output_path.with_suffix(".pdf"))
+    plt.close()
+
+
+def _plot_metric(rows, compression_type, metric, output_path, ylabel, ylim=None):
     import matplotlib.pyplot as plt
 
     selected = [row for row in rows if row["compression_type"] == compression_type]
     if not selected:
         return
     x_key = "compression_level"
-    plt.figure(figsize=(6, 4))
-    for method in sorted({row["method"] for row in selected}):
+    plt.figure(figsize=(7, 4.5))
+    for method in sorted({row["method"] for row in selected}, key=_plot_order):
         method_rows = [row for row in selected if row["method"] == method]
         levels = sorted({float(row[x_key]) for row in method_rows})
         values = []
+        errors = []
+        kept_levels = []
         for level in levels:
-            level_values = [float(row[metric]) for row in method_rows if float(row[x_key]) == level]
-            values.append(sum(level_values) / len(level_values))
-        plt.plot(levels, values, marker="o", label=method)
+            level_values = [
+                _finite_float(row[metric])
+                for row in method_rows
+                if float(row[x_key]) == level
+            ]
+            level_values = [value for value in level_values if value is not None]
+            if not level_values:
+                continue
+            kept_levels.append(level)
+            values.append(_mean(level_values))
+            errors.append(_std(level_values))
+        if not kept_levels:
+            continue
+        plt.errorbar(
+            kept_levels,
+            values,
+            yerr=errors,
+            marker="o",
+            capsize=3,
+            linewidth=2,
+            label=_plot_label(method),
+        )
     plt.xlabel("Pruning ratio" if compression_type == "pruning" else "Quantization bits")
     plt.ylabel(ylabel)
-    plt.title(f"{ylabel} vs {compression_type}")
+    title_name = "pruning" if compression_type == "pruning" else "weight quantization"
+    plt.title(f"{ylabel} vs {title_name}")
+    if ylim is not None:
+        plt.ylim(*ylim)
     plt.grid(True, alpha=0.3)
     plt.legend()
-    plt.tight_layout()
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(output_path, dpi=150)
-    plt.close()
+    _save_report_figure(output_path)
+
+
+def _plot_precompression_summary(rows, output_path):
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    selected = [row for row in rows if row["compression_type"] == "pruning" and float(row["compression_level"]) == 0.0]
+    if not selected:
+        return
+
+    methods = sorted({row["method"] for row in selected}, key=_plot_order)
+    metrics = [
+        ("acc", "ACC"),
+        ("wsr_non_target", "WSR non-target"),
+        ("clean_target_rate", "Clean target rate"),
+    ]
+    x = np.arange(len(methods))
+    width = 0.24
+
+    plt.figure(figsize=(8, 4.8))
+    for offset, (metric, label) in enumerate(metrics):
+        means = []
+        errors = []
+        for method in methods:
+            values = [
+                _finite_float(row[metric])
+                for row in selected
+                if row["method"] == method
+            ]
+            values = [value for value in values if value is not None]
+            means.append(_mean(values))
+            errors.append(_std(values))
+        plt.bar(
+            x + (offset - 1) * width,
+            means,
+            width,
+            yerr=errors,
+            capsize=3,
+            label=label,
+        )
+
+    plt.axhline(0.20, color="tab:red", linestyle="--", linewidth=1, alpha=0.7, label="Clean target gate")
+    plt.xticks(x, [_plot_label(method) for method in methods], rotation=15, ha="right")
+    plt.ylabel("Rate")
+    plt.ylim(0.0, 1.05)
+    plt.title("Pre-compression watermark validity")
+    plt.grid(True, axis="y", alpha=0.3)
+    plt.legend(ncol=2)
+    _save_report_figure(output_path)
 
 
 def _plot_all(rows, figure_dir):
     figure_dir = Path(figure_dir)
-    _plot_metric(rows, "pruning", "wsr", figure_dir / "wsr_vs_pruning.png", "WSR")
-    _plot_metric(rows, "pruning", "acc", figure_dir / "acc_vs_pruning.png", "Accuracy")
-    _plot_metric(rows, "quantization", "wsr", figure_dir / "wsr_vs_quantization.png", "WSR")
-    _plot_metric(rows, "quantization", "acc", figure_dir / "acc_vs_quantization.png", "Accuracy")
+    _plot_precompression_summary(rows, figure_dir / "precompression_validity.png")
+    _plot_metric(rows, "pruning", "acc", figure_dir / "acc_vs_pruning.png", "Accuracy", ylim=(0.0, 1.05))
+    _plot_metric(
+        rows,
+        "pruning",
+        "wsr_non_target",
+        figure_dir / "wsr_non_target_vs_pruning.png",
+        "WSR non-target",
+        ylim=(0.0, 1.05),
+    )
+    _plot_metric(
+        rows,
+        "pruning",
+        "clean_target_rate",
+        figure_dir / "clean_target_rate_vs_pruning.png",
+        "Clean target rate",
+        ylim=(0.0, 0.5),
+    )
+    _plot_metric(
+        rows,
+        "quantization",
+        "acc",
+        figure_dir / "acc_vs_quantization.png",
+        "Accuracy",
+        ylim=(0.0, 1.05),
+    )
+    _plot_metric(
+        rows,
+        "quantization",
+        "wsr_non_target",
+        figure_dir / "wsr_non_target_vs_quantization.png",
+        "WSR non-target",
+        ylim=(0.0, 1.05),
+    )
     _plot_metric(
         rows,
         "quantization",
         "clean_target_rate",
         figure_dir / "clean_target_rate_vs_quantization.png",
         "Clean target rate",
+        ylim=(0.0, 0.5),
     )
     _plot_metric(
         rows,
@@ -360,6 +509,14 @@ def _plot_all(rows, figure_dir):
         "selected_survival_rate",
         figure_dir / "selected_survival_rate_vs_pruning.png",
         "Selected survival rate",
+        ylim=(0.0, 1.05),
+    )
+    _plot_metric(
+        rows,
+        "quantization",
+        "selected_quant_error",
+        figure_dir / "selected_quant_error_vs_quantization.png",
+        "Selected quantization error",
     )
 
 

@@ -20,6 +20,7 @@ from thesis import (
     run_resnet_precompression_diagnostic,
     run_resnet_watermark_sweep,
     run_thesis,
+    plot_rows_file,
 )
 from watermark import train_clean, train_watermark
 
@@ -389,6 +390,8 @@ def parse_args():
     parser.add_argument("--wm-epochs", type=int, default=None)
     parser.add_argument("--clean-checkpoint", default=None)
     parser.add_argument("--pretrain-only", action="store_true")
+    parser.add_argument("--plot-results", default=None)
+    parser.add_argument("--plot-output-dir", default=None)
     return parser.parse_args()
 
 
@@ -444,6 +447,11 @@ def load_thesis_config(args, loaded_config=None):
 
 if __name__ == "__main__":
     args = parse_args()
+    if args.plot_results is not None:
+        figure_dir = plot_rows_file(args.plot_results, args.plot_output_dir)
+        print(f"saved figures to {figure_dir}")
+        raise SystemExit(0)
+
     loaded_config = load_config(args.config) if args.config is not None else None
     if (
         (loaded_config is not None and is_thesis_config(loaded_config))

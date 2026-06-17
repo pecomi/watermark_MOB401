@@ -60,14 +60,33 @@ python main.py --config configs/cifar10_small_pretrain.yaml
 Then load the fixed clean checkpoint and train only the watermark methods:
 
 ```powershell
-python main.py --config configs/cifar10_small_direct_mask30.yaml
+python main.py --config configs/cifar10_small_full_mask30.yaml
 ```
 
 Mask-capacity ablation:
 
 ```powershell
-python main.py --config configs/cifar10_small_direct_mask10.yaml
+python main.py --config configs/cifar10_small_full_mask10.yaml
 ```
+
+Regenerate report-ready figures from an existing result CSV:
+
+```powershell
+python main.py --plot-results outputs/thesis_results/results_full_mask30.csv
+python main.py --plot-results outputs/thesis_results/results_full_mask10.csv
+```
+
+The figure directory contains PNG and PDF versions of:
+
+- `precompression_validity`
+- `acc_vs_pruning`
+- `wsr_non_target_vs_pruning`
+- `clean_target_rate_vs_pruning`
+- `acc_vs_quantization`
+- `wsr_non_target_vs_quantization`
+- `clean_target_rate_vs_quantization`
+- `selected_survival_rate_vs_pruning`
+- `selected_quant_error_vs_quantization`
 
 Fast smoke version:
 
