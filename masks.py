@@ -55,7 +55,24 @@ def _quant_channel_error(param, bits):
     return error
 
 
-def _channel_scores(model, importance, selection_mode, quant_bits, alpha):
+def _combine_scores(fisher_score, watermark_score=None, watermark_alpha=0.0):
+    score = fisher_score.detach()
+    if watermark_score is not None and watermark_alpha > 0.0:
+        score = _minmax_normalize(score) + watermark_alpha * _minmax_normalize(
+            watermark_score.detach()
+        )
+    return score
+
+
+def _channel_scores(
+    model,
+    importance,
+    selection_mode,
+    quant_bits,
+    alpha,
+    watermark_importance=None,
+    watermark_alpha=0.0,
+):
     modules = _module_lookup(model)
     scores = {}
     for module_name, module in modules.items():
@@ -71,6 +88,14 @@ def _channel_scores(model, importance, selection_mode, quant_bits, alpha):
             score = fisher.sum(dim=1)
         else:
             continue
+        wm_score = None
+        if watermark_importance is not None and weight_name in watermark_importance:
+            wm = watermark_importance[weight_name].detach()
+            if wm.ndim == 4:
+                wm_score = wm.flatten(1).sum(dim=1)
+            elif wm.ndim == 2:
+                wm_score = wm.sum(dim=1)
+        score = _combine_scores(score, wm_score, watermark_alpha)
         if selection_mode == "quant_stable":
             quant_error = _quant_channel_error(module.weight, quant_bits)
             score = _minmax_normalize(score) - alpha * _minmax_normalize(quant_error)
@@ -78,12 +103,24 @@ def _channel_scores(model, importance, selection_mode, quant_bits, alpha):
     return scores
 
 
-def make_parameter_masks(model, importance, percent, selection_mode, quant_bits, alpha, random_mask, seed):
+def make_parameter_masks(
+    model,
+    importance,
+    percent,
+    selection_mode,
+    quant_bits,
+    alpha,
+    random_mask,
+    seed,
+    watermark_importance=None,
+    watermark_alpha=0.0,
+):
     scores = {}
     for name, param in model.named_parameters():
         if name not in importance:
             continue
-        score = importance[name].detach()
+        wm_score = watermark_importance.get(name) if watermark_importance is not None else None
+        score = _combine_scores(importance[name], wm_score, watermark_alpha)
         if selection_mode == "quant_stable":
             quant_error = _fake_quant_error_tensor(param.detach(), quant_bits)
             score = _minmax_normalize(score) - alpha * _minmax_normalize(quant_error)
@@ -108,8 +145,27 @@ def make_parameter_masks(model, importance, percent, selection_mode, quant_bits,
     return masks
 
 
-def make_channel_masks(model, importance, percent, selection_mode, quant_bits, alpha, random_mask, seed):
-    channel_scores = _channel_scores(model, importance, selection_mode, quant_bits, alpha)
+def make_channel_masks(
+    model,
+    importance,
+    percent,
+    selection_mode,
+    quant_bits,
+    alpha,
+    random_mask,
+    seed,
+    watermark_importance=None,
+    watermark_alpha=0.0,
+):
+    channel_scores = _channel_scores(
+        model,
+        importance,
+        selection_mode,
+        quant_bits,
+        alpha,
+        watermark_importance=watermark_importance,
+        watermark_alpha=watermark_alpha,
+    )
     masks = {}
     modules = _module_lookup(model)
 
@@ -146,16 +202,36 @@ def create_direct_masks(
     alpha,
     random_mask=False,
     seed=0,
+    watermark_importance=None,
+    watermark_alpha=0.0,
 ):
     if selection_mode == "random":
         random_mask = True
     if granularity == "parameter":
         return make_parameter_masks(
-            model, importance, percent, selection_mode, quant_bits, alpha, random_mask, seed
+            model,
+            importance,
+            percent,
+            selection_mode,
+            quant_bits,
+            alpha,
+            random_mask,
+            seed,
+            watermark_importance=watermark_importance,
+            watermark_alpha=watermark_alpha,
         )
     if granularity == "channel":
         return make_channel_masks(
-            model, importance, percent, selection_mode, quant_bits, alpha, random_mask, seed
+            model,
+            importance,
+            percent,
+            selection_mode,
+            quant_bits,
+            alpha,
+            random_mask,
+            seed,
+            watermark_importance=watermark_importance,
+            watermark_alpha=watermark_alpha,
         )
     raise ValueError(f"Unsupported mask granularity: {granularity}")
 

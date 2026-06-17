@@ -135,15 +135,18 @@ def _selected_activation_channels(masks, activation_layer):
     return selected.nonzero(as_tuple=False).flatten()
 
 
-def _masked_grad_step(model, optimizer, masks):
+def _masked_grad_step(model, optimizer, masks, mask_floor=0.0, grad_clip=None):
     for name, param in model.named_parameters():
         if param.grad is None:
             continue
         mask = masks.get(name)
         if mask is None:
-            param.grad.zero_()
+            param.grad.mul_(mask_floor)
         else:
-            param.grad.mul_(mask.to(device=param.grad.device, dtype=param.grad.dtype))
+            mask = mask.to(device=param.grad.device, dtype=param.grad.dtype)
+            param.grad.mul_(mask_floor + (1.0 - mask_floor) * mask)
+    if grad_clip is not None and grad_clip > 0.0:
+        torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
     optimizer.step()
 
 
@@ -165,6 +168,8 @@ def train_mask_direct_watermark(
     use_activation_guidance=False,
     activation_layer="layer4",
     lambda_act=0.0,
+    mask_floor=0.0,
+    grad_clip=None,
 ):
     model.train()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -214,7 +219,13 @@ def train_mask_direct_watermark(
                 else:
                     wm_loss = lambda_wm * wm_loss
                 wm_loss.backward()
-                _masked_grad_step(model, optimizer, masks)
+                _masked_grad_step(
+                    model,
+                    optimizer,
+                    masks,
+                    mask_floor=mask_floor,
+                    grad_clip=grad_clip,
+                )
                 batch_wm_loss += wm_loss.item()
 
             total_loss += (clean_loss.item() + batch_wm_loss) * x.size(0)

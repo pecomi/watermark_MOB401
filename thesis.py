@@ -9,7 +9,7 @@ import torch
 from compression import apply_fake_quantization, apply_pruning
 from data import make_loaders, set_seed
 from evaluate import evaluate_thesis_metrics
-from importance import compute_importance
+from importance import compute_importance, compute_watermark_importance
 from masks import create_direct_masks, selected_quant_error, selected_survival_rate
 from models import build_model
 from watermark import train_clean, train_mask_direct_watermark, train_watermark
@@ -34,6 +34,9 @@ THESIS_FIELDS = [
     "poison_ratio",
     "watermark_steps_per_batch",
     "direct_embedding_mode",
+    "mask_floor",
+    "wm_importance_alpha",
+    "grad_clip",
     "use_activation_guidance",
     "lambda_act",
     "diagnosis",
@@ -167,7 +170,7 @@ def _save_trigger_debug_grid(data_loader, dataset, trigger_size, output_path):
     save_image(grid, output_path)
 
 
-def _train_method(method, cfg, clean_state, importance, train_loader, device, seed):
+def _train_method(method, cfg, clean_state, importance, watermark_importance, train_loader, device, seed):
     model = build_model(cfg["dataset"], cfg["model_name"]).to(device)
     model.load_state_dict(clean_state)
 
@@ -221,6 +224,8 @@ def _train_method(method, cfg, clean_state, importance, train_loader, device, se
             cfg["quant_error_alpha"],
             random_mask=(method == "random_mask_direct"),
             seed=seed,
+            watermark_importance=watermark_importance,
+            watermark_alpha=cfg["wm_importance_alpha"],
         )
         train_mask_direct_watermark(
             model,
@@ -240,6 +245,8 @@ def _train_method(method, cfg, clean_state, importance, train_loader, device, se
             use_activation_guidance=cfg["use_activation_guidance"],
             activation_layer=cfg["activation_layer"],
             lambda_act=cfg["lambda_act"],
+            mask_floor=cfg["mask_floor"],
+            grad_clip=cfg["grad_clip"],
         )
         return model, masks
 
@@ -282,6 +289,9 @@ def _result_row(cfg, seed, method, compression_type, compression_level, metrics,
         "poison_ratio": cfg["poison_ratio"],
         "watermark_steps_per_batch": cfg["watermark_steps_per_batch"],
         "direct_embedding_mode": cfg["direct_embedding_mode"],
+        "mask_floor": cfg["mask_floor"],
+        "wm_importance_alpha": cfg["wm_importance_alpha"],
+        "grad_clip": cfg["grad_clip"],
         "use_activation_guidance": cfg["use_activation_guidance"],
         "lambda_act": cfg["lambda_act"],
         "diagnosis": metrics["diagnosis"],
@@ -368,12 +378,34 @@ def run_thesis(cfg, device):
 
         importance = compute_importance(clean_model, train_loader, device, cfg["importance_batches"])
         importance = {name: score.detach() for name, score in importance.items()}
+        watermark_importance = None
+        if cfg["wm_importance_alpha"] > 0.0:
+            watermark_importance = compute_watermark_importance(
+                clean_model,
+                train_loader,
+                device,
+                cfg["importance_batches"],
+                target_label=cfg["target_label"],
+                dataset=cfg["dataset"],
+                trigger_size=cfg["trigger_size"],
+                poison_ratio=cfg["poison_ratio"],
+            )
+            watermark_importance = {name: score.detach() for name, score in watermark_importance.items()}
 
         trained = {}
         masks_by_method = {}
         for method in cfg["methods"]:
             print(f"training method={method}")
-            model, masks = _train_method(method, cfg, clean_state, importance, train_loader, device, seed)
+            model, masks = _train_method(
+                method,
+                cfg,
+                clean_state,
+                importance,
+                watermark_importance,
+                train_loader,
+                device,
+                seed,
+            )
             trained[method] = model
             masks_by_method[method] = masks
             _save_checkpoint(
@@ -523,6 +555,7 @@ def run_direct_embedding_sweep(cfg, device):
             sweep_cfg,
             clean_state,
             importance,
+            None,
             train_loader,
             device,
             seed,
@@ -715,7 +748,7 @@ def run_resnet_precompression_diagnostic(args, device):
         importance = {name: score.detach() for name, score in importance.items()}
 
         for method in cfg["methods"]:
-            model, _ = _train_method(method, cfg, clean_state, importance, train_loader, device, seed)
+            model, _ = _train_method(method, cfg, clean_state, importance, None, train_loader, device, seed)
             metrics = evaluate_thesis_metrics(
                 model,
                 test_loader,
@@ -768,7 +801,7 @@ def run_direct_embedding_diagnostic(args, device):
             run_cfg = copy.deepcopy(cfg)
             run_cfg["stable_mask_percent"] = stable_mask_percent
             for method in cfg["methods"]:
-                model, _ = _train_method(method, run_cfg, clean_state, importance, train_loader, device, seed)
+                model, _ = _train_method(method, run_cfg, clean_state, importance, None, train_loader, device, seed)
                 metrics = evaluate_thesis_metrics(
                     model,
                     test_loader,
@@ -838,6 +871,9 @@ def default_thesis_config(args):
     watermark_train_mode = watermark_train_mode if args.watermark_train_mode is None else args.watermark_train_mode
     direct_embedding_mode = args.direct_embedding_mode or "joint"
     lambda_clean = 0.5 if args.lambda_clean is None else args.lambda_clean
+    mask_floor = 0.0 if args.mask_floor is None else args.mask_floor
+    wm_importance_alpha = 0.0 if args.wm_importance_alpha is None else args.wm_importance_alpha
+    grad_clip = None if args.grad_clip is None else args.grad_clip
     use_activation_guidance = args.use_activation_guidance
     activation_layer = args.activation_layer or "layer4"
     lambda_act = 0.1 if args.lambda_act is None else args.lambda_act
@@ -872,6 +908,9 @@ def default_thesis_config(args):
         "watermark_train_mode": watermark_train_mode,
         "direct_embedding_mode": direct_embedding_mode,
         "lambda_clean": lambda_clean,
+        "mask_floor": mask_floor,
+        "wm_importance_alpha": wm_importance_alpha,
+        "grad_clip": grad_clip,
         "use_activation_guidance": use_activation_guidance,
         "activation_layer": activation_layer,
         "lambda_act": lambda_act,
