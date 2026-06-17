@@ -170,6 +170,9 @@ def train_mask_direct_watermark(
     lambda_act=0.0,
     mask_floor=0.0,
     grad_clip=None,
+    clean_state=None,
+    importance=None,
+    lambda_reg=0.0,
 ):
     model.train()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -218,6 +221,12 @@ def train_mask_direct_watermark(
                     wm_loss = lambda_wm * wm_loss + lambda_clean * clean_reg
                 else:
                     wm_loss = lambda_wm * wm_loss
+                if lambda_reg > 0.0 and clean_state is not None and importance is not None:
+                    wm_loss = wm_loss + lambda_reg * stable_regularizer(
+                        model,
+                        clean_state,
+                        importance,
+                    )
                 wm_loss.backward()
                 _masked_grad_step(
                     model,

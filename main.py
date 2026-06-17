@@ -387,6 +387,8 @@ def parse_args():
     parser.add_argument("--train-subset", type=int, default=None)
     parser.add_argument("--clean-epochs", type=int, default=None)
     parser.add_argument("--wm-epochs", type=int, default=None)
+    parser.add_argument("--clean-checkpoint", default=None)
+    parser.add_argument("--pretrain-only", action="store_true")
     return parser.parse_args()
 
 
@@ -421,6 +423,8 @@ if __name__ == "__main__":
         or args.resnet_wm_sweep
         or args.poster_resnet_diagnostic
         or args.poster_direct_diagnostic
+        or args.clean_checkpoint is not None
+        or args.pretrain_only
     ):
         thesis_config = default_thesis_config(args)
         device_name = args.device

@@ -146,6 +146,19 @@ def _save_checkpoint(model, path):
     torch.save(model.state_dict(), path)
 
 
+def _clean_checkpoint_path(cfg, checkpoint_dir, seed):
+    template = cfg.get("clean_checkpoint")
+    if template:
+        return Path(
+            template.format(
+                dataset=cfg["dataset"],
+                model=cfg["model_name"],
+                seed=seed,
+            )
+        )
+    return checkpoint_dir / f"{cfg['dataset']}_{cfg['model_name']}_seed{seed}_clean.pt"
+
+
 def _passes_precompression_gate(metrics):
     return (
         metrics["acc"] >= 0.75
@@ -247,6 +260,9 @@ def _train_method(method, cfg, clean_state, importance, watermark_importance, tr
             lambda_act=cfg["lambda_act"],
             mask_floor=cfg["mask_floor"],
             grad_clip=cfg["grad_clip"],
+            clean_state=clean_state,
+            importance=importance,
+            lambda_reg=cfg["lambda_reg"],
         )
         return model, masks
 
@@ -366,15 +382,21 @@ def run_thesis(cfg, device):
         )
 
         clean_model = build_model(cfg["dataset"], cfg["model_name"]).to(device)
-        train_clean(clean_model, train_loader, device, cfg["epochs_clean"], cfg["lr"])
+        clean_checkpoint_path = _clean_checkpoint_path(cfg, checkpoint_dir, seed)
+        if cfg.get("clean_checkpoint") and clean_checkpoint_path.exists():
+            print(f"loading clean checkpoint: {clean_checkpoint_path}")
+            clean_model.load_state_dict(torch.load(clean_checkpoint_path, map_location=device))
+        else:
+            train_clean(clean_model, train_loader, device, cfg["epochs_clean"], cfg["lr"])
+            _save_checkpoint(clean_model, clean_checkpoint_path)
         clean_state = {
             name: tensor.detach().cpu().clone()
             for name, tensor in clean_model.state_dict().items()
         }
-        _save_checkpoint(
-            clean_model,
-            checkpoint_dir / f"{cfg['dataset']}_{cfg['model_name']}_seed{seed}_clean.pt",
-        )
+
+        if cfg.get("pretrain_only"):
+            print(f"saved clean checkpoint: {clean_checkpoint_path}")
+            continue
 
         importance = compute_importance(clean_model, train_loader, device, cfg["importance_batches"])
         importance = {name: score.detach() for name, score in importance.items()}
@@ -438,7 +460,12 @@ def run_thesis(cfg, device):
                         float("nan"),
                     )
                 )
-                print(f"skipping compression for {method}: weak pre-compression watermark")
+                print(
+                    f"skipping compression for {method}: weak pre-compression watermark "
+                    f"(acc={pre_metrics['acc']:.4f}, "
+                    f"wsr_non_target={pre_metrics['wsr_non_target']:.4f}, "
+                    f"clean_target_rate={pre_metrics['clean_target_rate']:.4f})"
+                )
                 continue
             for ratio in cfg["pruning_ratios"]:
                 compressed = copy.deepcopy(model).to(device)
@@ -489,6 +516,8 @@ def run_thesis(cfg, device):
                     )
                 )
 
+    if cfg.get("pretrain_only"):
+        return rows
     _write_csv(output_dir / "results_all.csv", rows)
     _plot_all(rows, figure_dir)
     return rows
@@ -884,6 +913,8 @@ def default_thesis_config(args):
         "seeds": seeds,
         "data_dir": "data",
         "output_dir": "outputs/thesis_results",
+        "clean_checkpoint": args.clean_checkpoint,
+        "pretrain_only": args.pretrain_only,
         "batch_size": 128,
         "num_workers": 2,
         "train_subset": args.train_subset,

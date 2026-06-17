@@ -51,6 +51,18 @@ Recommended small-CNN check:
 python main.py --dataset cifar10 --model cifar_small --seeds 42 43 44 --methods standard stable_aware_reg stable_mask_direct random_mask_direct --device cuda:0
 ```
 
+Pretrain the clean small-CNN once and reuse it for watermark-only experiments:
+
+```powershell
+python main.py --dataset cifar10 --model cifar_small --seeds 42 --pretrain-only --clean-checkpoint outputs/thesis_results/checkpoints/cifar10_cifar_small_seed{seed}_clean.pt --device cuda:0
+```
+
+Then load the fixed clean checkpoint and train only the watermark methods:
+
+```powershell
+python main.py --dataset cifar10 --model cifar_small --methods stable_mask_direct random_mask_direct --seeds 42 --clean-checkpoint outputs/thesis_results/checkpoints/cifar10_cifar_small_seed{seed}_clean.pt --wm-epochs 20 --stable-mask-percent 0.3 --poison-ratio 0.05 --lambda-wm 5.0 --watermark-steps-per-batch 2 --direct-embedding-mode wm_focused --lambda-clean 0.3 --learning-rate-watermark 0.0003 --mask-floor 0.05 --wm-importance-alpha 0.5 --grad-clip 1.0 --trigger-size 4 --target-label 0 --device cuda:0
+```
+
 Fast smoke version:
 
 ```powershell
