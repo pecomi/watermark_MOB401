@@ -8,6 +8,7 @@ output_dir: outputs/thesis_results
 result_name: results_full_mask10_seed42
 clean_checkpoint: outputs/thesis_results/checkpoints/cifar10_cifar_small_seed{seed}_clean.pt
 pretrain_only: false
+evaluate_failed_precompression: true
 cpu: false
 device: cuda:2
 
@@ -19,13 +20,15 @@ epochs_clean: 20
 epochs_watermark: 10
 lr: 0.001
 learning_rate_watermark: 0.0001
+baseline_epochs_watermark: 5
 baseline_learning_rate_watermark: 0.001
-baseline_lambda_wm: 2.0
-baseline_poison_ratio: 0.03
+baseline_lambda_wm: 1.0
+baseline_lambda_reg: 0.1
+baseline_poison_ratio: 0.01
 baseline_watermark_steps_per_batch: 1
 
 poison_ratio: 0.03
-trigger_size: 4
+trigger_size: 3
 target_label: 0
 lambda_wm: 2.0
 lambda_reg: 1.0

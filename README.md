@@ -6,7 +6,7 @@ PyTorch experiment comparing standard trigger-based model watermarking with a st
 
 - Dataset: MNIST, 10 classes
 - Model: small CNN with two convolution blocks and two linear layers
-- Trigger: 4x4 white patch at the bottom-right corner
+- Trigger: bottom-right white patch (`4x4` for MNIST, `3x3` for CIFAR-10 configs)
 - Target label: `0`
 - WSR: fraction of triggered test images classified as the target label
 
@@ -66,6 +66,8 @@ python main.py --config configs/cifar10_small_full_mask30.yaml
 The full config includes `standard`, `stable_aware_reg`, `stable_mask_direct`, and
 `random_mask_direct`. Baseline methods use a separate watermark learning rate so they are
 not under-trained by the conservative direct-mask setting.
+It also sets `evaluate_failed_precompression: true`, so all methods are plotted under
+compression even if a method shows weak pre-compression validity.
 
 Single-seed example run for report figures:
 
@@ -116,7 +118,7 @@ Improved direct embedding with soft stable-biased updates and watermark-gradient
 selection:
 
 ```powershell
-python main.py --dataset cifar10 --model cifar_small --methods stable_mask_direct random_mask_direct --seeds 42 --wm-epochs 10 --stable-mask-percent 0.3 --poison-ratio 0.03 --lambda-wm 2.0 --lambda-reg 1.0 --watermark-steps-per-batch 1 --direct-embedding-mode wm_focused --lambda-clean 1.0 --learning-rate-watermark 0.0001 --mask-floor 0.02 --wm-importance-alpha 0.5 --grad-clip 0.5 --trigger-size 4 --target-label 0 --device cuda:0
+python main.py --dataset cifar10 --model cifar_small --methods stable_mask_direct random_mask_direct --seeds 42 --wm-epochs 10 --stable-mask-percent 0.3 --poison-ratio 0.03 --lambda-wm 2.0 --lambda-reg 1.0 --watermark-steps-per-batch 1 --direct-embedding-mode wm_focused --lambda-clean 1.0 --learning-rate-watermark 0.0001 --mask-floor 0.02 --wm-importance-alpha 0.5 --grad-clip 0.5 --trigger-size 3 --target-label 0 --device cuda:0
 ```
 
 ## Setup

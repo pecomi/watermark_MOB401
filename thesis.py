@@ -225,7 +225,7 @@ def _train_method(method, cfg, clean_state, importance, watermark_importance, tr
             _method_value(cfg, method, "lambda_wm", cfg["lambda_wm"]),
             target_label=cfg["target_label"],
             dataset=cfg["dataset"],
-            trigger_size=cfg["trigger_size"],
+            trigger_size=_method_value(cfg, method, "trigger_size", cfg["trigger_size"]),
             poison_ratio=_method_value(cfg, method, "poison_ratio", cfg["poison_ratio"]),
             watermark_train_mode=_method_value(cfg, method, "watermark_train_mode", cfg.get("watermark_train_mode", "joint")),
             watermark_steps_per_batch=_method_value(cfg, method, "watermark_steps_per_batch", cfg.get("watermark_steps_per_batch", 1)),
@@ -245,7 +245,7 @@ def _train_method(method, cfg, clean_state, importance, watermark_importance, tr
             importance=importance,
             target_label=cfg["target_label"],
             dataset=cfg["dataset"],
-            trigger_size=cfg["trigger_size"],
+            trigger_size=_method_value(cfg, method, "trigger_size", cfg["trigger_size"]),
             poison_ratio=_method_value(cfg, method, "poison_ratio", cfg["poison_ratio"]),
             watermark_train_mode=_method_value(cfg, method, "watermark_train_mode", cfg.get("watermark_train_mode", "joint")),
             watermark_steps_per_batch=_method_value(cfg, method, "watermark_steps_per_batch", cfg.get("watermark_steps_per_batch", 1)),
@@ -609,15 +609,17 @@ def run_thesis(cfg, device):
 
         for method, model in trained.items():
             masks = masks_by_method[method]
+            eval_trigger_size = _method_value(cfg, method, "trigger_size", cfg["trigger_size"])
             pre_metrics = evaluate_thesis_metrics(
                 model,
                 test_loader,
                 device,
                 target_label=cfg["target_label"],
                 dataset=cfg["dataset"],
-                trigger_size=cfg["trigger_size"],
+                trigger_size=eval_trigger_size,
             )
-            if not _passes_precompression_gate(pre_metrics):
+            passes_gate = _passes_precompression_gate(pre_metrics)
+            if not passes_gate:
                 pre_metrics = dict(pre_metrics)
                 pre_metrics["diagnosis"] = "weak_precompression_watermark"
                 rows.append(
@@ -632,13 +634,20 @@ def run_thesis(cfg, device):
                         float("nan"),
                     )
                 )
+                if not cfg.get("evaluate_failed_precompression", False):
+                    print(
+                        f"skipping compression for {method}: weak pre-compression watermark "
+                        f"(acc={pre_metrics['acc']:.4f}, "
+                        f"wsr_non_target={pre_metrics['wsr_non_target']:.4f}, "
+                        f"clean_target_rate={pre_metrics['clean_target_rate']:.4f})"
+                    )
+                    continue
                 print(
-                    f"skipping compression for {method}: weak pre-compression watermark "
+                    f"continuing compression evaluation for {method} despite weak pre-compression watermark "
                     f"(acc={pre_metrics['acc']:.4f}, "
                     f"wsr_non_target={pre_metrics['wsr_non_target']:.4f}, "
                     f"clean_target_rate={pre_metrics['clean_target_rate']:.4f})"
                 )
-                continue
             for ratio in cfg["pruning_ratios"]:
                 compressed = copy.deepcopy(model).to(device)
                 apply_pruning(compressed, ratio)
@@ -648,7 +657,7 @@ def run_thesis(cfg, device):
                     device,
                     target_label=cfg["target_label"],
                     dataset=cfg["dataset"],
-                    trigger_size=cfg["trigger_size"],
+                    trigger_size=eval_trigger_size,
                 )
                 survival = selected_survival_rate(compressed, masks) if masks else float("nan")
                 rows.append(
@@ -672,7 +681,7 @@ def run_thesis(cfg, device):
                     device,
                     target_label=cfg["target_label"],
                     dataset=cfg["dataset"],
-                    trigger_size=cfg["trigger_size"],
+                    trigger_size=eval_trigger_size,
                 )
                 quant_error = selected_quant_error(model, compressed, masks) if masks else float("nan")
                 rows.append(
